@@ -1,14 +1,16 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import { CustomFieldsEditor } from "@/components/contacts/CustomFieldsEditor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useEditLead } from "@/hooks/kanban/useUpdateLead";
 import type { Lead } from "@/lib/types/leads";
+import type { CampoDoFunil } from "@/lib/kanban/campos-do-funil";
 import { updateLeadSchema, type UpdateLeadInput } from "@/lib/schemas/leads";
 import { parseReaisToCents } from "@/lib/money";
 import { EcoDoValor } from "./EcoDoValor";
@@ -24,6 +26,13 @@ interface FormShape {
 interface Props {
   lead: Lead;
   pipelineId: string;
+  /**
+   * O que o FUNIL declarou em `settings.fields` — quem tem o funil em mãos
+   * passa daqui (o board), porque este formulário só recebe o `pipelineId` e
+   * buscar as settings de novo seria uma segunda leitura do que a tela já tem.
+   * Vazio (o padrão) = funil sem campo personalizado.
+   */
+  camposPersonalizados?: CampoDoFunil[];
   /** Quando o salvamento dá certo. O dossiê NÃO fecha aqui — ver abaixo. */
   onSaved?: () => void;
   /** O dossiê não tem "cancelar"; o diálogo tem. */
@@ -44,8 +53,46 @@ function centsToReais(cents: number | null | undefined): string {
  * registro justamente de quem o produziu — a funcionalidade que prova "sua ação
  * fica registrada" provaria isso para todo mundo menos para o autor.
  */
-export function LeadFieldsForm({ lead, pipelineId, onSaved, onCancel }: Props) {
+export function LeadFieldsForm({
+  lead,
+  pipelineId,
+  camposPersonalizados = [],
+  onSaved,
+  onCancel,
+}: Props) {
   const edit = useEditLead(pipelineId);
+
+  /**
+   * Os campos personalizados ficam FORA do react-hook-form: as chaves são dado
+   * do tenant, não nomes conhecidos em tempo de compilação, e registrá-las como
+   * campos exigiria `register(chave)` com string arbitrária — inclusive as que
+   * o RHF lê como caminho (`a.b`, `a[0]`), que viraria objeto aninhado onde o
+   * jsonb espera uma chave só.
+   *
+   * O valor ATUAL do lead é a semente, não um objeto vazio: `custom_fields`
+   * também recebe escrita de webhook, importador e agente, e o PATCH substitui
+   * o jsonb inteiro — partir do vazio apagaria em silêncio tudo que o funil não
+   * declara.
+   */
+  const [personalizados, setPersonalizados] = useState<Record<string, unknown>>(
+    () => ({ ...(lead.custom_fields ?? {}) }),
+  );
+
+  /**
+   * Trocou de negócio → repõe. Ajuste DURANTE o render, o padrão do React para
+   * "a prop mudou, reponha o estado": em efeito ele dispararia render em
+   * cascata (o compilador avisa, e com razão) — o mesmo caminho já tomado em
+   * app/app/kanban/_client.tsx.
+   *
+   * O gatilho é o `id`, não o lead inteiro: o board recebe o próprio salvamento
+   * de volta pelo realtime, e repor a cada objeto novo atropelaria o que a
+   * pessoa está digitando.
+   */
+  const [negocioDosPersonalizados, setNegocioDosPersonalizados] = useState(lead.id);
+  if (negocioDosPersonalizados !== lead.id) {
+    setNegocioDosPersonalizados(lead.id);
+    setPersonalizados({ ...(lead.custom_fields ?? {}) });
+  }
 
   const form = useForm<FormShape>({
     defaultValues: {
@@ -91,6 +138,14 @@ export function LeadFieldsForm({ lead, pipelineId, onSaved, onCancel }: Props) {
       tags,
       expected_close_date: values.expected_close_date || null,
     };
+
+    // Só entra no patch o funil que DECLARA campo. Sem esta guarda, todo
+    // salvamento em funil sem campo personalizado mandaria `custom_fields` que
+    // este formulário nunca mostrou — escrever de volta um jsonb que a tela não
+    // exibe é assinar por dado que ninguém reviu.
+    if (camposPersonalizados.length > 0) {
+      patch.custom_fields = personalizados;
+    }
 
     const parsed = updateLeadSchema.safeParse(patch);
     if (!parsed.success) {
@@ -157,6 +212,24 @@ export function LeadFieldsForm({ lead, pipelineId, onSaved, onCancel }: Props) {
           <Label htmlFor="tagsRaw">Tags (separadas por vírgula)</Label>
           <Input id="tagsRaw" placeholder="vip, recompra" {...form.register("tagsRaw")} />
         </div>
+
+        {/* Seção só existe quando o funil declara campo: um título "Campos
+            personalizados" sobre o vazio prometeria uma configuração que a
+            instalação não tem, e mandaria procurar o que não foi criado. */}
+        {camposPersonalizados.length > 0 && (
+          <div className="space-y-3 border-t border-border pt-4">
+            <h4 className="text-xs font-medium uppercase tracking-wide text-text-muted">
+              Campos personalizados
+            </h4>
+            <CustomFieldsEditor
+              mode="lead"
+              fields={camposPersonalizados}
+              value={personalizados}
+              onChange={setPersonalizados}
+              disabled={edit.isPending}
+            />
+          </div>
+        )}
 
       <div className="flex justify-end gap-2">
         {onCancel && (

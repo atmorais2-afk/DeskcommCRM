@@ -8,6 +8,7 @@ import { useMoveCard } from "@/hooks/kanban/useMoveCard";
 import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { useAtRiskLeads } from "@/hooks/leads/useAtRiskLeads";
 import { useReactivations } from "@/hooks/leads/useReactivations";
+import { camposDoFunil } from "@/lib/kanban/campos-do-funil";
 import { midpoint } from "@/lib/kanban/fractional-indexing";
 import type { Lead } from "@/lib/types/leads";
 import type { Pipeline, Stage } from "@/lib/kanban/types";
@@ -109,6 +110,19 @@ export function KanbanBoard({
   const canonicalTags = useMemo(() => {
     const raw = (pipelineProp ?? queryResult.data?.pipeline)?.settings?.canonical_tags;
     return Array.isArray(raw) ? raw.filter((t): t is string => typeof t === "string") : [];
+  }, [pipelineProp, queryResult.data?.pipeline]);
+  // Os campos personalizados saem da MESMA settings das tags canônicas, e pela
+  // mesma razão de estarem aqui: quem tem o funil é o board — o dossiê recebe
+  // só o `pipelineId`, e mandá-lo reler as settings seria uma segunda leitura
+  // do que esta tela já carregou para desenhar os cards.
+  const camposPersonalizados = useMemo(() => {
+    // Corpo em bloco, como o vizinho acima, e NÃO por gosto: o gate de
+    // vocabulário (tests/unit/vocabulario-do-funil.test.ts) varre texto entre
+    // `>` e `<` sem parser, então uma arrow de corpo único faz o `=>` abrir uma
+    // varredura que atravessa linhas e denuncia o identificador `pipeline` como
+    // se fosse copy de tela. Chave logo após a seta fecha a janela.
+    const settings = (pipelineProp ?? queryResult.data?.pipeline)?.settings;
+    return camposDoFunil(settings);
   }, [pipelineProp, queryResult.data?.pipeline]);
 
   // O dossiê é do BOARD e não da página: ele precisa do lead inteiro e do nome
@@ -260,6 +274,7 @@ export function KanbanBoard({
             data.stages.find((s) => s.id === leadDoDossie.stage_id)?.name ?? "—"
           }
           ownerNames={ownerNames}
+          camposPersonalizados={camposPersonalizados}
         />
       )}
     </DragDropContext>
