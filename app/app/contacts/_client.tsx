@@ -18,11 +18,13 @@ import { ContactsTable } from "@/components/contacts/ContactsTable";
 import { NewContactDialog } from "@/components/contacts/NewContactDialog";
 import { EmptyContacts } from "@/components/empty";
 
+// Origens que esta instalação usa. A opção "Nuvemshop" saiu junto com a integração
+// (esta instalação não vende por loja online) — filtro de uma origem que nunca chega
+// só ensina o operador a ignorar o seletor.
 const SOURCE_OPTIONS = [
   { value: undefined, label: "Todas as origens" },
   { value: "manual", label: "Manual" },
   { value: "whatsapp", label: "WhatsApp" },
-  { value: "nuvemshop", label: "Nuvemshop" },
 ];
 
 export function ContactsListClient() {
