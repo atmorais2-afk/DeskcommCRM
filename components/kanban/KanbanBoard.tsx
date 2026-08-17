@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useArrastarQuadro } from "@/hooks/kanban/useArrastarQuadro";
 import { useBoard } from "@/hooks/kanban/useBoard";
 import { useMoveCard } from "@/hooks/kanban/useMoveCard";
 import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
@@ -128,6 +129,15 @@ export function KanbanBoard({
   // O dossiê é do BOARD e não da página: ele precisa do lead inteiro e do nome
   // do estágio, que só existem aqui depois do agrupamento.
   const [dossieId, setDossieId] = useState<string | null>(null);
+  // A alça de arrastar o quadro. Fica AQUI porque o container que rola é este —
+  // a coluna só empresta o cabeçalho. Desestruturado na chamada, e não guardado
+  // como objeto: o compilador do React trata como ref TUDO que carrega uma, e
+  // ler `quadro.aoPegar` no meio do render viraria acesso a ref durante render.
+  const {
+    ref: refDoQuadro,
+    aoPegar: aoPegarCabecalho,
+    arrastando,
+  } = useArrastarQuadro();
   const [internalSelected, setInternalSelected] = useState<Set<string>>(new Set());
   const selectedLeadIds = useMemo(
     () => (selectedIds ? new Set(selectedIds) : internalSelected),
@@ -246,7 +256,7 @@ export function KanbanBoard({
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="flex h-full gap-3 overflow-x-auto p-4">
+      <div ref={refDoQuadro} className="flex h-full gap-3 overflow-x-auto p-4">
         {data.stages.map((stage) => (
           <StageColumn
             key={stage.id}
@@ -259,6 +269,8 @@ export function KanbanBoard({
             pulses={pulsesProp ?? queryResult.pulses}
             canonicalTags={canonicalTags}
             selectedLeadIds={selectedLeadIds}
+            aoPegarCabecalho={aoPegarCabecalho}
+            arrastando={arrastando}
             onSelect={handleSelect}
             onOpen={setDossieId}
           />

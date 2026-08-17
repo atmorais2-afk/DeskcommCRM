@@ -1,6 +1,6 @@
 "use client";
 import { Droppable } from "@hello-pangea/dnd";
-import type { CSSProperties } from "react";
+import type { CSSProperties, PointerEvent as EventoDePonteiro } from "react";
 import { cn } from "@/lib/utils";
 import type { Lead } from "@/lib/types/leads";
 import type { Stage } from "@/lib/kanban/types";
@@ -22,6 +22,15 @@ interface StageColumnProps {
   selectedLeadIds?: Set<string>;
   /** leadId → quantos eventos remotos já chegaram (muda = pulsa de novo). */
   pulses?: Map<string, number>;
+  /**
+   * Pegar o quadro pelo cabeçalho desta etapa e puxá-lo para o lado.
+   *
+   * O gesto é do BOARD (é ele que tem o container que rola); a coluna só
+   * empresta o cabeçalho como alça. Ver `useArrastarQuadro`.
+   */
+  aoPegarCabecalho?: (evento: EventoDePonteiro<HTMLElement>) => void;
+  /** O quadro está sendo arrastado agora — muda o cursor da alça. */
+  arrastando?: boolean;
   onSelect?: (leadId: string, additive: boolean) => void;
   /** Abrir o dossiê — atravessa o board até o card, como `pulses`. */
   onOpen?: (leadId: string) => void;
@@ -49,6 +58,8 @@ export function StageColumn({
   canonicalTags,
   selectedLeadIds,
   pulses,
+  aoPegarCabecalho,
+  arrastando,
   onSelect,
   onOpen,
 }: StageColumnProps) {
@@ -59,7 +70,16 @@ export function StageColumn({
 
   return (
     <div className="flex w-80 shrink-0 flex-col rounded-lg border border-border bg-surface-muted/40">
-      <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
+      <div
+        className={cn(
+          "flex items-center gap-2 border-b border-border px-3 py-2.5",
+          // `select-none` acompanha a alça: sem ele, arrastar rápido pinta o
+          // nome da etapa de azul no meio do gesto.
+          aoPegarCabecalho &&
+            cn("select-none", arrastando ? "cursor-grabbing" : "cursor-grab"),
+        )}
+        onPointerDown={aoPegarCabecalho}
+      >
         <span
           className={cn(
             "h-2 w-2 rounded-full",
