@@ -111,7 +111,15 @@ export const notificationPrefsSchema = z.object({
 });
 export type NotificationPrefsInput = z.infer<typeof notificationPrefsSchema>;
 
-const customFieldSchema = z.object({
+/**
+ * Um campo personalizado do funil, como ele vive em `crm_pipelines.settings.fields`.
+ *
+ * Exportado porque a LEITURA precisa da mesma definição da escrita: a tela do
+ * negócio narra o jsonb de volta em inputs (ver lib/kanban/campos-do-funil.ts) e
+ * uma segunda cópia do que é um campo divergiria no dia em que um tipo novo
+ * entrasse aqui.
+ */
+export const customFieldSchema = z.object({
   key: z
     .string()
     .min(1)

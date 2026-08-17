@@ -57,7 +57,13 @@ export type LoseLeadInput = z.infer<typeof loseLeadSchema>;
 
 /**
  * createLeadSchema → POST /api/v1/leads
- * Status, source_metadata, custom_fields, position_in_stage are server-managed.
+ * Status, source_metadata e position_in_stage are server-managed.
+ *
+ * `custom_fields` fica DE FORA da criação de propósito: os campos declarados em
+ * `crm_pipelines.settings.fields` são preenchidos na tela do negócio, depois que
+ * ele existe. Aceitá-los aqui exigiria que todo produtor de lead (webhook,
+ * formulário, importador, agente) conhecesse o esquema do funil de destino — e
+ * o que chegasse fora do esquema entraria no jsonb sem ninguém para exibi-lo.
  */
 export const createLeadSchema = z.object({
   pipeline_id: z.string().uuid(),
@@ -104,6 +110,22 @@ export const updateLeadSchema = z.object({
     .nullable()
     .optional(),
   tags: z.array(z.string()).optional(),
+  /**
+   * Os campos que o TENANT declarou em `crm_pipelines.settings.fields` — o
+   * esquema é dado, não código, e por isso o valor não tem forma fixa aqui.
+   *
+   * Aberto (`z.unknown()`) de propósito: cada chave tem o tipo que o funil
+   * declarou (texto, número, data, lista…), e reproduzir essa validação neste
+   * schema criaria uma SEGUNDA definição do que é um campo personalizado, ao
+   * lado de `customFieldSchema` em lib/schemas/settings.ts — as duas
+   * discordariam no mês em que alguém acrescentasse um tipo. Quem conhece o
+   * esquema (o editor, na tela) é quem monta o objeto.
+   *
+   * O patch SUBSTITUI o jsonb inteiro: quem envia precisa mandar o objeto
+   * completo, não só as chaves tocadas — inclusive as que outros produtores
+   * escreveram e o funil não declara.
+   */
+  custom_fields: z.record(z.string(), z.unknown()).optional(),
 });
 export type UpdateLeadInput = z.infer<typeof updateLeadSchema>;
 

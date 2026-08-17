@@ -3,6 +3,7 @@ import { useRef } from "react";
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useLeadTimeline } from "@/hooks/leads/useLeadTimeline";
+import type { CampoDoFunil } from "@/lib/kanban/campos-do-funil";
 import type { Lead } from "@/lib/types/leads";
 import { ConversaNoDossie } from "./ConversaNoDossie";
 import { LeadFieldsForm } from "./LeadFieldsForm";
@@ -18,6 +19,11 @@ interface Props {
   pipelineId: string;
   stageName: string;
   ownerNames?: Map<string, string | null>;
+  /**
+   * Os campos que o funil declara. Vem do BOARD, que já tem o funil inteiro em
+   * mãos — o dossiê só repassa, do mesmo jeito que faz com o nome do estágio.
+   */
+  camposPersonalizados?: CampoDoFunil[];
 }
 
 function formatBRL(cents: number | null, currency: string | null): string {
@@ -53,6 +59,7 @@ export function LeadDossier({
   pipelineId,
   stageName,
   ownerNames,
+  camposPersonalizados,
 }: Props) {
   const campos = useRef<HTMLDivElement | null>(null);
   const timeline = useLeadTimeline(open ? lead.id : null, lead.contact_id);
@@ -141,7 +148,11 @@ export function LeadDossier({
           <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-text-muted">
             Dados do negócio
           </h3>
-          <LeadFieldsForm lead={lead} pipelineId={pipelineId} />
+          <LeadFieldsForm
+            lead={lead}
+            pipelineId={pipelineId}
+            camposPersonalizados={camposPersonalizados}
+          />
         </div>
       </SheetContent>
     </Sheet>

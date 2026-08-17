@@ -397,6 +397,12 @@ export async function updateLeadHandler(
     patch.expected_close_date = input.expected_close_date;
   }
   if (input.tags !== undefined) patch.tags = input.tags;
+  // Substituição do jsonb INTEIRO, não merge: com merge não existiria gesto
+  // capaz de APAGAR um campo personalizado — mandar a chave ausente seria
+  // "não mexi nela" e mandar `null` deixaria lixo no objeto. Quem edita já
+  // manda o estado completo (ver LeadFieldsForm), e o que outros produtores
+  // escreveram viaja junto porque a tela parte do valor atual do lead.
+  if (input.custom_fields !== undefined) patch.custom_fields = input.custom_fields;
 
   // O filtro entra AQUI TAMBÉM, e não só no SELECT acima: entre ler e escrever
   // há uma janela, e defesa que depende de uma leitura anterior é defesa que

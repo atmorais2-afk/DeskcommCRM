@@ -3,9 +3,17 @@
  * CustomFieldsEditor — scaffolded for EPIC-09/10 follow-ups.
  *
  * Reads `crm_pipelines.settings.fields[]` declarative schema and renders the
- * appropriate input per field type. NOT WIRED to any page yet — the consumer
- * (lead detail / contact detail) plugs it in once pipelines have published
- * field schemas.
+ * appropriate input per field type.
+ *
+ * EM USO NO NEGÓCIO (`mode="lead"`): o formulário do dossiê o monta a partir de
+ * `lib/kanban/campos-do-funil.ts` e salva o resultado em `crm_leads.custom_fields`
+ * — ver components/kanban/LeadFieldsForm.tsx. O que o funil declara na
+ * configuração passou a aparecer e a ser editável na tela.
+ *
+ * `mode="contact"` continua SEM consumidor: a ficha do contato ainda não tem
+ * onde guardar o esquema (o de campo personalizado é do FUNIL, e contato não
+ * pertence a um). Enquanto isso não for resolvido, plugar aqui seria oferecer um
+ * formulário sem destino.
  */
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
