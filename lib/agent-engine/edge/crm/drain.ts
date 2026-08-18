@@ -18,6 +18,7 @@ import type pg from 'pg';
 import type { Logger } from '../../obs/logger';
 import { enqueueJob } from '../../queue/queue';
 import { TIPOS_DERIVAVEIS, DERIVACAO_TERMINADA } from '@/lib/messaging/media/derivable';
+import { ehSoEncerramento } from './fechamento-de-conversa';
 
 const DRAIN_CONSUMER = 'agent-engine';
 
@@ -219,9 +220,10 @@ async function processEvent(
   // VPS: dispatch às 20:24:22, derivação só pedida às 20:25:03.
   const { rows: msgRows } = await pool.query<{
     type: string;
+    body: string | null;
     media_derived_status: string | null;
   }>(
-    `select type, media_derived_status from messages
+    `select type, body, media_derived_status from messages
      where organization_id = $1 and id = $2`,
     [event.organization_id, p.inbound_message_id],
   );
@@ -245,6 +247,28 @@ async function processEvent(
       tipo: msg.type,
       esperando_ha_ms: esperandoHa,
     });
+  }
+
+  // Só um adeus: NÃO acordar o agente. Sem isto, toda cortesia final acorda um
+  // turno, e um turno sempre tem algo a dizer — foi assim que o agente mandou
+  // quatro mensagens (18/08/2026) para uma conversa que já tinha acabado:
+  // "Até mais!" → "Por nada! Ficando à disposição 😊" → "Combinado, até mais!"
+  // → "Até mais! 😊" → "Até mais!" → "Por aqui encerro nossa conversa".
+  //
+  // Cada uma dessas gastou cota diária de um número em AQUECIMENTO — a cota que
+  // existe para a conversa que importa. E parar aqui, antes do enqueue, custa
+  // zero token: o turno nem chega a ser criado.
+  //
+  // A regra é conservadora de propósito (ver `ehSoEncerramento`): concordância
+  // pura não silencia, porque depois de "posso te enviar a proposta?" um "ok"
+  // é um SIM. O texto continua gravado e visível na conversa — o que não
+  // acontece é o agente responder.
+  if (msg !== undefined && ehSoEncerramento(msg.body)) {
+    log.info('drain: mensagem é só despedida/agradecimento — turno pulado (sem gasto)', {
+      event_id: event.id,
+      contact_id: p.contact_id,
+    });
+    return 'processado';
   }
 
   // Coalescência: já existe job PENDING futuro deste contato → esta mensagem
