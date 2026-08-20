@@ -102,7 +102,12 @@ export function MessageBubble({ message, debugCitations }: Props) {
         <div
           className={cn(
             "mt-1 flex items-center justify-end gap-1 text-[10px]",
-            isOutbound ? "text-primary-foreground/70" : "text-muted-foreground",
+            // OPACIDADE CHEIA, e nao um percentual. Medido com a marca desta
+            // instalacao (#d14315): branco cheio da 4,64:1 sobre a bolha — passa AA
+            // para texto pequeno. A 85% cai para 3,28 e a 70% (como estava antes)
+            // para 2,73 — reprovado. Esmaecer a hora e a primeira coisa que se faz
+            // por estetica e a primeira que quebra quando a marca e uma cor clara.
+            isOutbound ? "text-primary-foreground" : "text-muted-foreground",
           )}
         >
           {editada && (
@@ -124,7 +129,13 @@ export function MessageBubble({ message, debugCitations }: Props) {
             <TooltipProvider delayDuration={200}>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="inline-flex items-center gap-0.5 font-semibold text-destructive">
+                  // CHIP PREENCHIDO, e nao `text-destructive` solto: a bolha de
+                  // saida e `bg-primary` — a cor da MARCA, que cada instalacao
+                  // escolhe. Vermelho sobre laranja (a marca desta) era ilegivel;
+                  // sobre uma marca vermelha, o selo sumiria por completo. O par
+                  // `bg-destructive`/`text-destructive-foreground` e garantido pelo
+                  // design system nos dois temas e independe da cor da bolha.
+                  <span className="inline-flex items-center gap-0.5 rounded-sm bg-destructive px-1 py-px font-semibold text-destructive-foreground">
                     <WarningOctagon size={10} weight="fill" aria-hidden /> Falhou
                   </span>
                 </TooltipTrigger>
