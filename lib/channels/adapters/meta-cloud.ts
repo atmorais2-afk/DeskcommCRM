@@ -102,7 +102,23 @@ export const metaCloudAdapter: ChannelAdapter = {
   isConfigured(): boolean {
     // Síncrono por contrato. Com credencial na sessão, quem confirma é o `send`
     // (async) — ver o comentário acima.
-    return metaCredsFromEnv() !== null;
+    // Sempre `true`, e NAO `metaCredsFromEnv() !== null`. E a MESMA divergencia
+    // ja resolvida em `adapters/zernio.ts`, pela mesma razao — agora medida
+    // tambem aqui, em producao (2026-08-20): com o canal conectado pela tela e
+    // sem credencial no `.env`, tres respostas do operador ficaram em `queued`
+    // com `queued_reason: meta_not_configured`, e o `send` NUNCA foi chamado.
+    // A tela mostrava a bolha enviada; nada tinha saido.
+    //
+    // `isConfigured` e sincrono e nao consulta o banco, entao olhar so o env
+    // responde "nao configurado" para toda instalacao que conectou pela tela —
+    // que e o caminho recomendado desde a 0118, por ser o unico que cifra o
+    // token. O contrato antigo protegia um caso (env vazio E sessao vazia) ao
+    // custo de quebrar o caso normal.
+    //
+    // O preco de responder `true` e que quem desiste passa a ser o `send` — e
+    // ele LANCA, para o handler gravar `failed` com motivo em vez de um `sent`
+    // sem id, que diria "enviado" para algo que nunca saiu.
+    return true;
   },
 
   /**
@@ -170,7 +186,13 @@ export const metaCloudAdapter: ChannelAdapter = {
     const creds = await resolveMetaCreds(createAdminClient(), envelope.sessionRef);
     // Mesmo contrato do outro canal: sem credencial é NOOP, não exceção. A UI mostra
     // o banner de "canal não conectado"; transformar em erro mudaria comportamento.
-    if (!creds) return { externalId: null };
+    // LANCA, nao devolve null: com `isConfigured` sempre true, quem desiste e
+    // este ponto — e `{externalId: null}` faria o handler gravar `sent` sem id.
+    if (!creds) {
+      throw new Error(
+        `meta_sem_credencial: a sessao ${envelope.sessionRef} nao tem token gravado e o .env nao supre — reconecte o canal oficial`,
+      );
+    }
 
     const corpo = mediaPayload(envelope) ?? { type: "text", text: { body: envelope.body ?? "" } };
 

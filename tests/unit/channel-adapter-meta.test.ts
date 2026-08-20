@@ -73,10 +73,14 @@ describe("adapter meta_cloud — endereçamento", () => {
 });
 
 describe("adapter meta_cloud — configuração", () => {
-  it("sem credencial NÃO está configurado", () => {
+  it("está configurado mesmo sem credencial no env — quem decide é o send", () => {
+    // Contrato DELIBERADAMENTE diferente do upstream, igual ao do canal
+    // intermediado. Com a credencial na sessão (caminho da tela, o único que
+    // cifra o token), responder `false` aqui faz o handler gravar `queued` e
+    // nunca chamar `send` — foi o que prendeu três mensagens em produção.
     vi.stubEnv("META_PHONE_NUMBER_ID", "");
     vi.stubEnv("META_SYSTEM_USER_TOKEN", "");
-    expect(a().isConfigured()).toBe(false);
+    expect(a().isConfigured()).toBe(true);
   });
 
   it("com credencial está configurado", () => {
@@ -84,12 +88,15 @@ describe("adapter meta_cloud — configuração", () => {
     expect(a().isConfigured()).toBe(true);
   });
 
-  it("não configurado é NOOP no envio, nunca exceção", async () => {
-    // Mesmo contrato do outro canal: a UI mostra banner, o handler grava `queued`.
+  it("sem credencial nenhuma o envio LANÇA — nunca devolve sucesso vazio", async () => {
+    // `{externalId: null}` faria o handler gravar `sent` sem id: a tela diria
+    // "enviado" para algo que não saiu. Lançar deixa o handler gravar `failed`
+    // com o motivo, que é o que o operador precisa ver.
     vi.stubEnv("META_PHONE_NUMBER_ID", "");
     vi.stubEnv("META_SYSTEM_USER_TOKEN", "");
-    const r = await a().send({ sessionRef: "x", to: "5531999", kind: "text", body: "oi" });
-    expect(r).toEqual({ externalId: null });
+    await expect(
+      a().send({ sessionRef: "x", to: "5531999", kind: "text", body: "oi" }),
+    ).rejects.toThrow(/meta_sem_credencial/);
   });
 
   it("os códigos carregam o nome do provider — por isso vivem no adapter", () => {
