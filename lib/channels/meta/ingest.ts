@@ -21,6 +21,7 @@
  *    `unique (organization_id, external_id)` não é higiene, é obrigatória: sem ela a
  *    mesma mensagem aparece N vezes no inbox depois de qualquer instabilidade.
  */
+import { aplicarEfeitosPosEntrada } from "../pos-entrada";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { ARCHIVED_AT, queryTolerantToMissingArchived } from "../archived";
@@ -165,6 +166,33 @@ export async function ingestMetaInbound(
     p_at: e.sentAt.toISOString(),
   } as never);
 
+  // OS EFEITOS DE NEGOCIO DA MENSAGEM — o passo COMPARTILHADO que faltava aqui.
+  //
+  // Gravar a mensagem e so metade da ingestao: opt-out, nascimento do lead e
+  // despacho do agente sao regra do PRODUTO, nao do transporte. O canal por QR
+  // e o intermediado ja delegam em `lib/channels/pos-entrada.ts`; este ficou de
+  // fora, e o cabecalho daquele arquivo ja media o resultado:
+  //
+  //   ai_agent.dispatch_requested   QR 806   oficial 0
+  //
+  // Medido de novo nesta instalacao (2026-08-20): a mensagem entrava, aparecia
+  // na caixa, e a IA nunca respondia. Sem erro e sem log — o caminho antigo
+  // (`workers/ai-response-worker.ts`) se cala de proposito quando existe agente
+  // publicado, porque assume que o engine responde. Como o engine nunca era
+  // acordado neste canal, os dois se calavam e ninguem atendia.
+  //
+  // Depois do carimbo da conversa de proposito: o turno do agente le a janela
+  // de 24h que aquele `fn_mark_conversation_message` acabou de mover.
+  await aplicarEfeitosPosEntrada(admin, {
+    organizationId: orgId,
+    contactId: contactId as string,
+    conversationId: conversationId as string,
+    messageId: (inserida as { id: string } | null)?.id ?? null,
+    channelSessionId: sessao.id,
+    texto: e.text,
+    nomeDoContato: e.profileName,
+    origem: "meta_webhook",
+  });
   return {
     status: "ingested",
     messageId: (inserida as { id: string } | null)?.id ?? "",

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -234,7 +234,7 @@ describe("nascimento do lead", () => {
  * A fiação. Os casos acima provam que o passo compartido FAZ a coisa certa;
  * estes provam que os dois canais o CHAMAM — que é o defeito original.
  */
-describe("os dois canais usam o mesmo passo", () => {
+describe("todos os canais usam o mesmo passo", () => {
   const ZERNIO = readFileSync("lib/channels/zernio/ingest.ts", "utf8");
   const WAHA = readFileSync("lib/waha/ingest.ts", "utf8");
 
@@ -266,5 +266,39 @@ describe("os dois canais usam o mesmo passo", () => {
   it("o vocabulário do opt-out vive num lugar só", () => {
     const compartilhado = readFileSync("lib/channels/pos-entrada.ts", "utf8");
     expect(compartilhado).toMatch(/export const STOP_RX/);
+  });
+
+  it("o canal OFICIAL da Meta também delega no compartilhado", () => {
+    // Ficou de fora quando o passo foi extraído, e o sintoma é o pior que
+    // existe: a mensagem entra, aparece na caixa, e a IA nunca responde —
+    // sem erro e sem log. O caminho antigo (`workers/ai-response-worker.ts`)
+    // se cala de propósito quando há agente publicado, porque assume que o
+    // engine responde; e o engine nunca era acordado neste canal. Os dois
+    // silenciavam, e ninguém atendia. Medido em produção em 2026-08-20.
+    const META = readFileSync("lib/channels/meta/ingest.ts", "utf8");
+    expect(META.includes("await aplicarEfeitosPosEntrada(admin, {")).toBe(true);
+  });
+
+  it("NENHUM ingest de canal fica sem o passo — inclusive os que ainda não existem", () => {
+    // A trava que faltava. O teste anterior dizia "os dois canais", e por isso
+    // o terceiro entrou sem ninguém notar. Esta varredura é sobre o DISCO: o
+    // próximo canal a nascer reprova aqui antes de chegar a produção mudo.
+    const ingests = [
+      "lib/waha/ingest.ts",
+      ...readdirSync("lib/channels", { withFileTypes: true })
+        .filter((d) => d.isDirectory())
+        .map((d) => `lib/channels/${d.name}/ingest.ts`)
+        .filter((f) => existsSync(f)),
+    ];
+    // Controle positivo: se a varredura não achar nada, ela passaria vazia.
+    expect(ingests.length, "a varredura não encontrou ingest nenhum").toBeGreaterThanOrEqual(3);
+
+    const semOPasso = ingests.filter(
+      (f) => !readFileSync(f, "utf8").includes("aplicarEfeitosPosEntrada"),
+    );
+    expect(
+      semOPasso,
+      "canal que grava a mensagem e não aplica opt-out, lead e despacho — o cliente escreve e ninguém atende",
+    ).toEqual([]);
   });
 });
