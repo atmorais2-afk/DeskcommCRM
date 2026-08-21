@@ -1,7 +1,7 @@
 "use client";
 
 import { toast } from "sonner";
-import { ApiError } from "@/lib/api/types";
+import { ApiError, NetworkError } from "@/lib/api/types";
 
 type Variant = "error" | "warning" | "info";
 
@@ -77,6 +77,17 @@ export function showApiError(err: unknown): void {
     toast.error(err.message || err.code, { description });
     return;
   }
+  // A requisição não chegou a virar resposta. Diz QUAL rota e SE foi tempo ou
+  // conexão: sem isso o operador vê uma pilha de toasts idênticos e ninguém —
+  // nem ele, nem quem for investigar — consegue saber o que falhou, porque erro
+  // que morre no cliente não deixa rastro no servidor.
+  if (err instanceof NetworkError) {
+    toast.error("Não consegui falar com o servidor.", {
+      description: `${err.message} · ID: ${err.requestId}`,
+    });
+    return;
+  }
+
   toast.error("Erro inesperado. Tente novamente.");
 }
 

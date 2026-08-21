@@ -1,6 +1,6 @@
 import type { ZodSchema } from "zod";
 
-import { ApiError, type ApiErrorBody } from "@/lib/api/types";
+import { ApiError, NetworkError, type ApiErrorBody } from "@/lib/api/types";
 import { randomId } from "@/lib/random-id";
 
 type HttpMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
@@ -191,7 +191,18 @@ async function request<T>(
         await sleep(backoffMs(attempt), opts.signal);
         continue;
       }
-      throw err;
+      // ⚠️ EMBRULHA COM CONTEXTO em vez de propagar o erro cru.
+      //
+      // Erro cru aqui não é `ApiError`, então `showApiError` cai no genérico
+      // "Erro inesperado. Tente novamente." — que não diz NADA: nem qual rota,
+      // nem se foi timeout ou rede, nem o id da requisição. Foi exatamente o
+      // que aconteceu em 2026-08-21: o operador viu uma pilha de toasts iguais
+      // e não havia como saber o que tinha falhado, porque o servidor não
+      // registra erro de conexão que morre no cliente.
+      //
+      // `timeoutMs` fica na mensagem porque "demorou demais" e "não conectou"
+      // pedem investigações opostas: a primeira olha a rota, a segunda a rede.
+      throw new NetworkError(method, path, timeoutMs, requestId, err);
     } finally {
       clearTimeout(timer);
     }

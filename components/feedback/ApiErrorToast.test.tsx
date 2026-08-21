@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ApiError } from "@/lib/api/types";
+import { ApiError, NetworkError } from "@/lib/api/types";
 
 vi.mock("sonner", () => ({
   toast: {
@@ -81,5 +81,30 @@ describe("ApiErrorToast", () => {
     showApiError(new Error("oops"));
     expect(toast.error).toHaveBeenCalledTimes(1);
     expect(toast.error).toHaveBeenCalledWith("Erro inesperado. Tente novamente.");
+  });
+});
+
+describe("falha de rede — o toast precisa dizer O QUE falhou", () => {
+  it("nomeia a rota e diz que foi tempo esgotado", () => {
+    const abort = new Error("aborted");
+    abort.name = "AbortError";
+    showApiError(new NetworkError("GET", "/api/v1/conversations", 10_000, "req-1", abort));
+
+    const [titulo, opts] = vi.mocked(toast.error).mock.calls.at(-1) as [string, { description: string }];
+    expect(titulo).toBe("Não consegui falar com o servidor.");
+    // A rota tem de aparecer: uma pilha de toasts idênticos não diz nada a
+    // ninguém, e erro que morre no cliente não deixa rastro no servidor.
+    expect(opts.description).toContain("/api/v1/conversations");
+    expect(opts.description).toContain("10s");
+    expect(opts.description).toContain("req-1");
+  });
+
+  it("distingue conexão caída de tempo esgotado", () => {
+    showApiError(new NetworkError("POST", "/api/v1/messages", 10_000, "req-2", new TypeError("failed to fetch")));
+
+    const [, opts] = vi.mocked(toast.error).mock.calls.at(-1) as [string, { description: string }];
+    // "demorou demais" e "não conectou" pedem investigações opostas.
+    expect(opts.description).toContain("conexão falhou");
+    expect(opts.description).not.toContain("sem resposta");
   });
 });
