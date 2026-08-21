@@ -128,13 +128,23 @@ export function MessageBubble({ message, debugCitations }: Props) {
             // conversa com falha de envio derrubava o painel inteiro (error boundary).
             <TooltipProvider delayDuration={200}>
               <Tooltip>
+                {/*
+                  CHIP PREENCHIDO, e não `text-destructive` solto: a bolha de
+                  saída é `bg-primary` — a cor da MARCA, que cada instalação
+                  escolhe. Vermelho sobre laranja (a marca desta) era ilegível;
+                  sobre uma marca vermelha, o selo sumiria por completo. O par
+                  `bg-destructive`/`text-destructive-foreground` é garantido pelo
+                  design system nos dois temas e independe da cor da bolha.
+
+                  ⚠️ E O COMENTÁRIO FICA AQUI FORA, em bloco de chaves. Escrito
+                  com barra-barra DENTRO do `TooltipTrigger`, ele não é
+                  comentário: vira nó de TEXTO. E `asChild` exige um único filho
+                  elemento — com texto ao lado do span, o Slot do Radix lança e
+                  derruba a árvore inteira. A tela vira "Algo deu errado" com um
+                  id opaco, sem rastro no servidor, e SÓ em conversa que tem
+                  mensagem falhada. Aconteceu em produção em 2026-08-21.
+                */}
                 <TooltipTrigger asChild>
-                  // CHIP PREENCHIDO, e nao `text-destructive` solto: a bolha de
-                  // saida e `bg-primary` — a cor da MARCA, que cada instalacao
-                  // escolhe. Vermelho sobre laranja (a marca desta) era ilegivel;
-                  // sobre uma marca vermelha, o selo sumiria por completo. O par
-                  // `bg-destructive`/`text-destructive-foreground` e garantido pelo
-                  // design system nos dois temas e independe da cor da bolha.
                   <span className="inline-flex items-center gap-0.5 rounded-sm bg-destructive px-1 py-px font-semibold text-destructive-foreground">
                     <WarningOctagon size={10} weight="fill" aria-hidden /> Falhou
                   </span>
